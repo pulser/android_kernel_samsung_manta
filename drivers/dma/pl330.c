@@ -1349,6 +1349,7 @@ static inline int _loop_infiniteloop(unsigned dry_run, u8 buf[],
 	/* forever loop */
 	off += _emit_MOV(dry_run, &buf[off], SAR, pxs->x->src_addr);
 	off += _emit_MOV(dry_run, &buf[off], DAR, pxs->x->dst_addr);
+	off += _emit_FLUSHP(dry_run, &buf[off], pxs->r->peri);
 
 	/* loop0 */
 	off += _emit_LP(dry_run, &buf[off], 0,  lcnt0);
@@ -1515,6 +1516,7 @@ static inline int _setup_xfer(unsigned dry_run, u8 buf[],
 	off += _emit_MOV(dry_run, &buf[off], SAR, x->src_addr);
 	/* DMAMOV DAR, x->dst_addr */
 	off += _emit_MOV(dry_run, &buf[off], DAR, x->dst_addr);
+	off += _emit_FLUSHP(dry_run, &buf[off], pxs->r->peri);
 
 	/* Setup Loop(s) */
 	off += _setup_loops(dry_run, &buf[off], pxs);
@@ -1664,17 +1666,19 @@ static int pl330_submit_req(void *ch_id, struct pl330_req *r)
 		goto xfer_exit;
 	}
 
-	/* Prefer Secure Channel */
-	if (!_manager_ns(thrd))
-		r->cfg->nonsecure = 0;
-	else
-		r->cfg->nonsecure = 1;
 
 	/* Use last settings, if not provided */
-	if (r->cfg)
+	if (r->cfg) {
+		/* Prefer Secure Channel */
+		if (!_manager_ns(thrd))
+			r->cfg->nonsecure = 0;
+		else
+			r->cfg->nonsecure = 1;
+
 		ccr = _prepare_ccr(r->cfg);
-	else
+	} else {
 		ccr = readl(regs + CC(thrd->id));
+	}
 
 	/* If this req doesn't have valid xfer settings */
 	if (!_is_valid(ccr)) {
@@ -3050,6 +3054,11 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
 		num_chan = max_t(int, pi->pcfg.num_peri, pi->pcfg.num_chan);
 
 	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
+	if (!pdmac->peripherals) {
+		ret = -ENOMEM;
+		dev_err(&adev->dev, "unable to allocate pdmac->peripherals\n");
+		goto probe_err4;
+	}
 
 	for (i = 0; i < num_chan; i++) {
 		pch = &pdmac->peripherals[i];

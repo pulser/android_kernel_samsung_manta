@@ -25,6 +25,7 @@
 #include <linux/persistent_ram.h>
 #include <linux/clk.h>
 #include <linux/spi/spi.h>
+#include <linux/ion.h>
 
 #include <video/platform_lcd.h>
 #include <video/s5p-dp.h>
@@ -918,8 +919,7 @@ static struct dw_mci_board exynos_dwmci0_pdata __initdata = {
 	.max_bus_hz		= 200 * 1000 * 1000,
 	.caps			= MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
 				  MMC_CAP_8_BIT_DATA | MMC_CAP_CMD23,
-	.caps2			= MMC_CAP2_HS200_1_8V_SDR | MMC_CAP2_PACKED_WR,
-	.desc_sz		= 4,
+	.caps2			= MMC_CAP2_HS200_1_8V_SDR,
 	.fifo_depth             = 0x80,
 	.detect_delay_ms	= 200,
 	.hclk_name		= "dwmci",
@@ -1722,6 +1722,7 @@ static void __init exynos_reserve_mem(void)
 		"exynos5-fimc-is=fimc_is;";
 
 	exynos_cma_region_reserve(regions, regions_secure, 0, map);
+	ion_reserve(&exynos_ion_pdata);
 }
 #else /* !CONFIG_CMA*/
 static inline void exynos_reserve_mem(void)
@@ -1933,7 +1934,6 @@ static void __init smdk5250_machine_init(void)
 	s3c_adc_set_platdata(&smdk5250_adc_data);
 
 	exynos_sysmmu_init();
-	exynos_ion_set_platdata();
 	smdk5250_dwmci_init();
 
 #ifdef CONFIG_VIDEO_EXYNOS_MFC
